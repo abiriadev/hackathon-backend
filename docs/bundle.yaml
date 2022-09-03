@@ -1,0 +1,1772 @@
+openapi: 3.0.0
+info:
+  title: Invasive species report API
+  description: |
+    # 생태계 교란종 신고 API
+
+    ## 개요
+
+    이 페이지는 대한민국의 생태계 교란종 관련된 정보를 공유하고,
+    유해종 발견 정보를 전달할 수 있는 API와 그 사용법에 대해 다룹니다.
+
+    ## 주의사항
+
+    이 문서를 읽기 전에 아래 주의사항을 참고하세요:
+     - 이 문서는 아직 100% 완성되지 않았습니다. 계획에 있지만 추가되지 않았거나 구현되어 있지만 문서화되지 않은 API가 있을 수 있습니다.
+     - 이 문서에 있는 **모든 API**는 현재 모두 사용이 불가능합니다.
+     - 이 문서의 모든 설명은 한국어로 작성되어 있지만, 부득이하게 대부분의 속성, 스키마, 예시는 영어 단어가 사용되어있을 수 있습니다.
+     - 이 문서에서는 유해종/교란종, 객체/스키마 등 같은 내용을 의미하는 여러 용어가 혼용되어 쓰이고 있습니다. 맥락에 따라서 같은 단어로 이해해 주세요.
+     - [노션 페이지](https://www.notion.so/API-spec-ea03874e329b4ed587b323473fe3592d#3b3975213de94a919ad917d669f690c6)에서 더 간략한 버전의 문서를 보실 수 있습니다.
+
+    ## 문서를 읽는 방법
+
+    API의 각 엔드포인트별로 응답과 결과, 어떻게 사용하는지에 대한 내용이 상세하게 작성되어 있으며,
+    클릭을 통해 전체 문서를 펼쳐서 볼 수 있습니다.
+
+    이 페이지는 엔드포인트별 문서뿐만 아니라
+    스키마(객체 또는 타입)별로 상세한 문서가 따로 존재합니다. \
+    모든 스키마 목록과 그 문서는 `swagger-ui`의 경우 페이지의 가장 하단에 위치해 있습니다.
+  version: 0.1.0
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+externalDocs:
+  description: 'external documentations: notion'
+  url: https://www.notion.so/e1ef736877fb4783a7b87042a10a2610
+servers:
+  - url: /
+    description: default endpoint
+security:
+  - JWTAuth: []
+components:
+  schemas:
+    Password:
+      description: 비밀번호를 나타내는 타입입니다.
+      type: string
+      format: password
+      example: 1q2w3e4r5t
+    Token:
+      type: string
+      description: |
+        인증에 사용하는 API키입니다.
+
+        매 요청시마다 해당 값을 헤더로 전송해야 합니다. 기본적으로 JWT토큰입니다.
+      example: >
+        eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+    ObjectId:
+      type: string
+      description: |
+        항상 고유한 식별자입니다.
+
+        `User`, `Post`, `Image`등이 모두 `id`를 이 형식으로 저장합니다.
+
+        API를 사용할 때는 문자열로 전달됩니다.
+      example: 6308a2c3d95ee0cf64b2e992
+    Date:
+      description: |
+        `UNIX timestamp` 로 표현되는 시간 자료형입니다.
+      type: integer
+      example: 1661493944000
+    User:
+      type: object
+      description: 유저 한명의 정보를 표현합니다.
+      properties:
+        id:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+          readOnly: true
+        name:
+          type: string
+          example: user123
+        createdAt:
+          oneOf:
+            - $ref: '#/components/schemas/Date'
+          readOnly: true
+    Error:
+      type: object
+      description: |
+        # 에러
+
+        에러 객체입니다.
+
+        ## 주의
+
+        **해당 객체를 직접 읽어들여서 에러 내용을 파악하려고 하지 마세요!**
+
+        '일반적으로' 발생 가능한 모든 에러들은 응답의 상태 코드로 구분됩니다. \
+        반면에 이 객체는 서버 내부 에러, 가동 불가, 파일시스템 접근 거부 등
+        완전히 예측 불가능한 값들마저 전달할 수 있습니다.
+
+        기본적으로 서버의 가장 뒤쪽에 위치한 에러 처리 미들웨어가 최후의 수단으로 이 에러를 전송합니다.
+
+        ## 일반 HTTP코드 전송
+
+        Error객체는 일반적인 에러를 표현하기도 하는 범용적인 객체입니다. \
+        (다만 그렇기 때문에 매번 값이 달라져 일관적인 파싱을 불가능하게 만듭니다)
+
+        HTTP코드로 표현 가능한 에러를 표현하는 해당 객체의 자식 클래스로 `HttpError` 스키마가 있습니다.
+      properties:
+        errorCode:
+          type: integer
+          description: |
+            에러를 구분하는 정수 번호.
+
+            하지만 반드시 같은 에러임을 보장하지는 않으며,
+            임의로 전달될 수 있습니다.
+          example: 123
+        message:
+          type: string
+          description: |
+            에러를 설명하는 '사람이 읽도록 만들어진' 에러 메세지입니다.
+
+            해당 메세지를 기계적으로 파싱하지 마세요.
+        additionalData:
+          description: |
+            에러 종류에 따라 달라지는 임의의 타입.
+
+            예를 들어 (배포용이 아닌) 서버 내부의 에러인 경우 StStacktrace가 나올 수도 있으며, \
+            오류가 난 위치나 이유, 관련된 객체의 값, 현재 시간, 로깅 정보 등등
+            항상 예측 불가능한 값이 응답으로 올 수 있습니다. \
+            따라서 이 값은 파싱하기 보다는 사람이 읽고서 판단하는 것이 유용합니다.
+          nullable: true
+          example: <어떤 에러 종류냐에 따라 달라지는 Stacktrace, Log등 임의의 에러 정보>
+    HttpError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          description: |
+            일반적으로 예측 가능한 범위에서 발생하는 에러들을 표현합니다.
+          properties:
+            errorCode:
+              type: integer
+              description: |
+                `HTTP` 상태 코드를 전달합니다.
+
+                **참고: 모든 api응답은 적절한 상태 코드를 반환합니다.**
+
+                이 값을 직접 읽기보단 전달받은 http 상태 코드를 직접 읽어주세요.
+              example: 401
+              enum:
+                - 400
+                - 401
+                - 403
+                - 404
+            message:
+              example: |
+                Couldn't verify the incoming request.
+                maybe you didn't send the proper token or sended an expired one.
+                please try again with a valid JWT token
+            additionalData:
+              type: 'null'
+              example: null
+              description: |
+                `HttpError`의 경우 항상 `null`입니다.
+    Category:
+      description: |
+        # 카테고리
+
+        각각의 글이 표시될 카테고리를 뜻합니다.
+
+        모든 글은 단 하나의 카테고리에 속하며,
+        보통 그 글의 주제에 맞게 정해집니다.
+
+        ## 종류
+
+        - `report`: 유해종 신고 게시판
+        - `qa`: 질문답변(Q & A) 게시판
+        - `info`: 교란종 관련 정보 게시판
+      type: string
+      enum:
+        - report
+        - qa
+        - info
+      example: report
+    Image:
+      description: |
+        # 이미지
+
+        이미지를 표현하는 타입입니다.
+
+        ## 주의
+
+        **이 타입 자체가 이미지는 아닙니다.**
+
+        물론 DB는 이미지를 저장하지만,
+        이 값은 DB에 저장된 이미지를 가리키는 URL을 사용합니다.
+
+        예를 들어, `POST /posts` 를 통해 새 글을 작성할 때 이미지를 첨부했다면,
+        `GET /posts/{id}` 로 해당 글을 요청할 때 `image` 필드에
+        `{..., "url":"http://<서버 도메인>/images/<이미지 ID>"...}`
+        와 같이 이미지의 url이 포함된 이미지 객체를 받습니다.
+
+        이 때, 이미지를 불러오는 일은 여러분이 직접 하지 않고
+        브라우저나 안드로이드/iOS가 알아서 처리하는 부분입니다.
+
+        일례로 웹의 경우, `<img src="http://<서버 도메인>/images/<이미지 ID>">` 처럼
+        그냥 `src`속성에 이미지 주소를 넣으면 됩니다.
+      type: object
+      properties:
+        id:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+          description: |
+            해당 이미지의 고유한 식별자입니다.
+
+            **주의: id는 이미지의 URL과 다릅니다**
+
+            아마 현재로썬 `<서버 주소>/images/<ID>` 를 이미지의 url로 사용하고 있지만
+            이는 항상 같도록 보장된 동작이 아닙니다.
+
+            예를 들어 id를 사용한다면 어느 순간 백엔드에서 이미지 저장 경로를 바꾸거나 \
+            CDN, fb등의 이미지 호스팅 업체를 사용하도록 바꾸었을 때 모든 이미지가 깨져 보일 수 있습니다.
+        name:
+          type: string
+          description: |
+            이미지 파일의 이름입니다.
+
+            시각장애인 등 웹 컨텐츠에 접근하기 어려운 사람들을 위해
+            `alt` 속성 등을 표시하거나 할 때 유용합니다.
+          example: suwon_bullfrog.jpg
+        url:
+          type: string
+          description: |
+            이미지를 찾을 수 있는 경로를 나타냅니다.
+
+            사실상 이 객체에서 가장 중요한 필드라고 해도 과언이 아닙니다.
+
+            이 값을 프런트엔드별로 적절한 이미지 뷰어에 넣어 주세요.
+          format: uri
+          example: https://example.com/images/630dd62072f484b2f2d8e62c
+        createdAt:
+          oneOf:
+            - $ref: '#/components/schemas/Date'
+          description: |
+            이미지가 업로드된 날짜입니다.
+    SpeciesPreview:
+      type: object
+      description: |
+        `id`, 이름, 사진 등 유해종의 간략한 정보를 담은 객체입니다.
+      properties:
+        id:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+          description: |
+            해당 유해종을 나타내는 고유한 id를 말합니다.
+
+            특정 유해종 검색시 이 id를 사용해야 합니다.
+        name:
+          type: string
+          description: |
+            해당 교란종의 이름을 뜻합니다.
+
+            학명과는 다릅니다. \
+            학명에 대한 정보가 필요하다면 `Species` 스키마를 참고해 주세요.
+          example: 황소개구리
+        image:
+          oneOf:
+            - $ref: '#/components/schemas/Image'
+          description: |
+            해당 유해종의 대표 사진입니다.
+
+            사용자를 위한 UI를 만들 때 이 필드를 사용해 \
+            사용자가 어떤 종을 선택해야 하는지를 쉽게 전달할 수 있습니다.
+
+            `Image` 객체를 전달하기 때문에 실제 데이터가 아니라 url이 들어 있습니다. \
+            이미지를 보이게 하는 방법은 `Image` 스키마의 문서를 참고하세요.
+    Location:
+      description: >
+        # 위치
+
+
+        지구상의 한 점의 위치를 나타내는 자료형입니다.
+
+
+        ## 좌표
+
+
+        기본적으로 위도와 경도로 이루어지며, 객체를 사용합니다.
+
+
+        ### 좌표 변환
+
+
+        DB내부적으로는 `[경도, 위도]` 순의 배열로 변환됩니다. \
+
+        API로 값을 전송하거나 받을 때에는 순서에 상관없이 `lat`와 `lng`필드를 읽을 수 있습니다.
+
+
+        ### 숫자 형식
+
+
+        해당 자료형은 `DD`(decimal degree)를 사용합니다. 즉,
+
+         1. 각도 단위로 `도`를 사용하지만 `분`, `초`등은 사용하지 않고 10진법 소수점으로 내려갑니다.
+         2. 방향을 `N`, `W` 등의 방향지표가 아닌 음수와 양수로 나타냅니다.
+
+        예를 들어 위도와 경도가 각각 `36° 21' 56.9196" N`, `127° 23' 16.314" E` 인 장소는 \
+
+        API로 보내지기 전 각각 `36.365811`과 `127.387865`로 변환되어야 합니다.
+
+
+        또한 `122° 28' 41.8656" W` 처럼 `W`(음수 방향)등이 있는 경우, 음수로 바뀝니다. `-122.478296`
+
+
+        #### 예시
+
+
+        | 장소명 | DMS좌표 | DD좌표 | 객체 포맷 |
+
+        | --- | --- | --- | --- |
+
+        | 한밭수목원 | `36° 21' 56.9196" N 127° 23' 16.314" E` | `36.365811,
+        127.387865` | `{"lat":36.365811,"lng":127.387865}` |
+
+        | 금문교 | `37° 49' 13.4688" N 122° 28' 41.8656" W` | `37.820408,
+        -122.478296` | `{"lat":37.820408,"lng":-122.478296}` |
+
+
+        ### 제한
+
+
+        `lat`과 `lng`은 모두 `double`포맷이며, \
+
+        정확도를 올리기 위해 소수점 이하로 최대한 많은 자릿수를 사용하는 것이 권장됩니다.
+
+
+        또한 다음과 같은 범위 제한을 가집니다:
+
+         - `lat`(latitude)는 `[-90, 90]` 의 범위에 위치합니다.
+         - `lng`(longitude)는 `[-180, 180]` 의 범위에 위치합니다.
+
+        ### 구글 맵 연동
+
+
+        **주의: 구글 맵 연동은 백엔드에서 처리하지 않습니다.**
+
+
+        다만 구글 맵 등을 통해 위치를 보여주고 싶은 경우,
+
+        전달받은 객체를 포맷할 필요가 있습니다.
+
+
+        구글 맵의 경우 API가 전달해주는 값과 정확히 동일한 `DD` 포맷을 사용합니다. \
+
+        따라서 다음과 같이 객체의 필드만 조립해도 원하는 결과를 얻을 수 있습니다.
+
+
+        ```javascript
+
+        // 자바스크립트 예시입니다. 모바일의 경우 작동하지 않습니다.
+
+        `${coordinates.lat}, ${coordinates.lng}`
+
+        ```
+
+
+        위도-경도 순이라는 점을 명심하세요.
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+      required:
+        - lat
+        - lng
+      example:
+        lat: 36.36581155365323
+        lng: 127.38786533487401
+    PostPreview:
+      type: object
+      properties:
+        id:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+          readOnly: true
+        createdAt:
+          oneOf:
+            - $ref: '#/components/schemas/Date'
+          readOnly: true
+          description: 해당 글이 언제 생성되었는지를 가리킵니다.
+        title:
+          type: string
+          description: |
+            글의 제목을 뜻합니다.
+
+            글자수에 제한은 없습니다.
+          example: 수원시에서 황소개구리를 발견했다!
+        author:
+          oneOf:
+            - $ref: '#/components/schemas/User'
+          readOnly: true
+        category:
+          $ref: '#/components/schemas/Category'
+        species:
+          oneOf:
+            - $ref: '#/components/schemas/SpeciesPreview'
+          description: |
+            이 글과 관계가 있는 교란종을 가리킵니다.
+
+            예를 들어 신고글인 경우, 어떤 종을 신고하는지 구체적으로 알 수 있습니다.
+
+            질문글의 경우도 어떤 종에 관련된 질문인지 표시할 수 있습니다.
+
+            현재까지는 배열이 아니며, 하나의 글은 단 하나의 관련된 교란종만 가질 수 있습니다.
+          readOnly: true
+        speciesId:
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+          description: |
+            이 글과 관계가 있는 교란종을 가리킵니다.
+
+            예를 들어 신고글인 경우, 어떤 종을 신고하는지 구체적으로 알 수 있습니다.
+
+            질문글의 경우도 어떤 종에 관련된 질문인지 표시할 수 있습니다.
+
+            현재까지는 배열이 아니며, 하나의 글은 단 하나의 관련된 교란종만 가질 수 있습니다.
+          writeOnly: true
+        location:
+          oneOf:
+            - $ref: '#/components/schemas/Location'
+          description: >
+            # 관련 장소
+
+
+            해당 글이 연관되어 있는 장소입니다.
+
+
+            ## 사용례
+
+
+            가장 일반적으로는, 신고글의 경우 _해당 교란종을 발견한 장소_가 될 수 있습니다.
+
+
+            다른 경우로는, 교란종 관련 뉴스를 공유할 때나 의심 제보 같은 경우도 연관된 장소 정보가 있을 수 있습니다.
+
+
+            ## 주의사항
+
+
+            이 필드는 optional 입니다. \
+
+            즉, 연관된 장소가 있는 글도 있을 수 있고, 관련 장소가 하나도 없는 글이 있을 수 있습니다.
+
+
+            이 필드는 배열이 아닙니다. \
+
+            안타깝게도 현재까지는 하나의 글은 하나의 지리 정보만을 저장할 수 있습니다.
+
+
+            ## 구현
+
+
+            위치 정보는 일반적으로 자주 사용될 일이 많지 않습니다.
+
+
+            다만 맵 뷰(지도 형태의 화면)를 사용하는 경우, `sortBy=location`을 사용해서 현재 사용자의 위치에서 가까운
+            지역 순으로 정렬된 결과를 낼 수 있습니다.
+
+
+            정렬된 결과 또한 결국엔 `Post` 이기 때문에,
+
+            지도의 특정 부분을 클릭해서 해당 Post로 바로 이동하는 기능을 구현할 수도 있습니다.
+
+
+            ### 주의사항
+
+
+            **주의: 위치 정보를 사용자에게 보여주는 것은 백엔드가 처리하지 않습니다.**
+
+
+            예를 들어, 위치 정보는 그저 숫자의 객체로 전달됩니다.
+
+
+            글을 화면에 보여줄 때 `{"lat":37.54455880374928,"lng":127.21681957127123}` 등의
+            데이터를 `하남시 신장동` 등으로 알아보기 쉽게 표시하거나 지도를 그리는 일은 프런트엔드(또는 앱)에서 담당해야 합니다.
+        image:
+          oneOf:
+            - $ref: '#/components/schemas/Image'
+          readOnly: true
+          description: >
+            해당 글에 첨부된 이미지 객체입니다.
+
+
+            글 내용과 별도로 존재하기 때문에 \
+
+            게시글 뷰를 구현한다면 이미지를 상단 또는 하단 등에 따로 추가해야 합니다.
+
+
+            이미지 객체는 이미지 자체의 데이터를 가진 것이 아닌 실제 이미지를 가리키는 URL이 담긴 `url`이라는 필드를 가지고
+            있습니다. \
+
+            따라서 이미지를 표시하고자 하는 경우, (웹의 경우) `<img src="이미지 객체.url">` 등을 사용해 적절한 곳에
+            이미지 주소를 넣어주시면 됩니다.
+        imageFile:
+          type: string
+          format: binary
+          writeOnly: true
+          description: |
+            이미지 바이너리 데이터입니다.
+
+            이 필드에 업로드하고자 하는 이미지 파일을 담아서 전송하세요.
+        imageFileName:
+          type: string
+          writeOnly: true
+          description: |
+            업로드하고자 하는 이미지의 파일명입니다.
+
+            만약 이 값이 생략되면, 서버에서 적당히 랜덤한 이름을 지을 수 있습니다.
+
+            반대로 이 값은 있지만 `imageFile` 필드가 비어 있다면 이 필드의 값은 아무런 영향도 끼치지 않습니다.
+          example: suwon_bullfrog.jpg
+        commentsCount:
+          type: integer
+          readOnly: true
+          description: |
+            해당 글에 달린 댓글 수를 보여줍니다.
+          example: 5
+    UserDetail:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            recentPosts:
+              type: array
+              items:
+                $ref: '#/components/schemas/PostPreview'
+              description: |
+                해당 유저가 가장 최근에 작성한 글들의 목록입니다.
+
+                해당 목록은 정렬이나 검색 옵션이 없으며,
+                서버에서 이미 시간순(최신순)으로 정렬된 채 전달됩니다.
+    LocationTuple:
+      type: array
+      description: >
+        `Location` 과 같이 좌표를 표현하는 타입입니다.
+
+
+        기본적으로 구조는 배열이지만 쿼리 등으로 전달될 때에는 `위도,경도` 와 같은 포맷을 사용합니다. \
+
+        (`,`사이에 띄어쓰기가 없음에 주의하세요)
+
+
+        예를 들어 `[39.04177339028841, 125.75121158250927]` 는
+        `"39.04177339028841,125.75121158250927"`
+
+        와 같이 포맷하여 전달해야 합니다.
+
+
+        `Location` 과 마찬가지로 위도와 경도는 각각 부호가 있는 `double` 자료형으로 표현됩니다.
+
+
+        자세한 내용은 `Location` 스키마의 문서를 참고하세요.
+      items:
+        type: number
+        format: double
+        minimum: -180
+        maximum: 180
+      minimum: 2
+      maximum: 2
+      example:
+        - 39.04177339028841
+        - 125.75321061799423
+    Comment:
+      type: object
+      properties:
+        createdAt:
+          oneOf:
+            - $ref: '#/components/schemas/Date'
+          readOnly: true
+        author:
+          oneOf:
+            - $ref: '#/components/schemas/User'
+          readOnly: true
+        content:
+          type: string
+          example: (대충 교란종 관련된 댓글 1)
+      required:
+        - content
+    PostPartial:
+      allOf:
+        - $ref: '#/components/schemas/PostPreview'
+        - type: object
+          properties:
+            content:
+              type: string
+              description: |
+                해당 글의 내용을 담은 문자열입니다.
+
+                마크다운 문법이 적용됩니다.
+              example: >
+                이 글은 제가 수원에서 발견한 황소개구리에 대한 길고 긴 이야기입니다.
+
+
+                이 글은 공간을 채우고 API이용자들에게 적절한 예시를 주기 위해 제작된 매우 쓸데없는 내용들로 가득 채운 글이기도
+                합니다.
+
+
+                사실 저는 황소개구리를 만나 본 적이 없습니다.
+
+
+                영서님 말로는 맛있다고 하네요(?)
+            comments:
+              type: array
+              description: |
+                해당 글이 가지고 있는 댓글의 배열입니다.
+
+                기본적으로 시간순으로 정렬되어 있기 때문에 \
+                프런트엔드에서 별도의 정렬 처리를 할 필요가 없습니다.
+              items:
+                $ref: '#/components/schemas/Comment'
+              readOnly: true
+    Post:
+      allOf:
+        - $ref: '#/components/schemas/PostPartial'
+        - type: object
+          required:
+            - title
+            - content
+            - category
+    Species:
+      allOf:
+        - $ref: '#/components/schemas/SpeciesPreview'
+        - type: object
+          description: |
+            생태계 유해종과 그에 관련된 나타내는 타입입니다.
+          properties:
+            binomialName:
+              type: string
+              description: 해당 유해종의 학명을 뜻합니다.
+            englishName:
+              type: string
+              description: 해당 유해종의 영명을 뜻합니다.
+            managementTaxon:
+              type: string
+              description: |
+                해당 유해종의 관리분류군을 뜻합니다.
+            taxon:
+              type: object
+              properties:
+                phylum:
+                  type: string
+                  description: |
+                    해당 유해종이 속한 `문`명을 뜻합니다.
+                class:
+                  type: string
+                  description: |
+                    해당 유해종이 속한 `강`명을 뜻합니다.
+                order:
+                  type: string
+                  description: |
+                    해당 유해종이 속한 `목`명을 뜻합니다.
+                family:
+                  type: string
+                  description: |
+                    해당 유해종이 속한 `과`명을 뜻합니다.
+                genus:
+                  description: |
+                    해당 유해종이 속한 `속`명을 뜻합니다.
+                  type: string
+                species:
+                  type: string
+                  description: |
+                    해당 유해종의 `종`명을 뜻합니다.
+            source:
+              type: string
+              format: uri
+              description: |
+                해당 정보의 자료 출처.
+
+                `한국외래생물 정보시스템`에서 수집한 자료는 공공누리
+                제 1유형에 따라 구체적인 자료 출처를 표시해야 합니다.
+  parameters:
+    Limit:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 0
+      description: 가져올 항목 수의 최댓값을 설정합니다
+      examples:
+        getOnlyOne:
+          summary: 요청에 부응하는 단 하나의 결과만을 가져옵니다.
+          value: 1
+        getFirst20:
+          summary: 응답으로 오는 항목들 중 첫 20개의 결과만을 가져옵니다.
+          value: 20
+    Skip:
+      in: query
+      name: skip
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: 결과 중 앞에서부터 얼마만큼의 항목을 생략할지를 설정합니다
+      examples:
+        skipNothing:
+          summary: 결과 중 아무것도 생략하지 않습니다. 기본값입니다.
+          value: 0
+        skipFirst20:
+          summary: 응답으로 오는 항목들 중 첫 20개의 결과만 빼도록 설정합니다.
+          value: 20
+    Search:
+      in: query
+      name: search
+      description: |
+        주어진 검색어를 사용해 검색합니다.
+
+        **주의: 검색 기능은 정확도를 보장하지 않습니다.**
+
+        예를 들어, `수원`이라고 입력한다고 해서
+        반드시 수원과 관련된 내용이 나오지 않습니다.
+
+        `Post`에 대한 자세한 검색을 하려는 경우, `sortBy=location` 등의 옵션을 생각해 보세요.
+
+        유저를 검색하려는 경우, 이름에 대한 단순한 텍스트 인덱싱 말고는
+        추가적인 옵션이 존재하지 않으니 주의해 주세요.
+      schema:
+        type: string
+      examples:
+        searchSuwon:
+          summary: 수원과 관련된 글 검색하기
+          value: 수원
+        searchHabiat:
+          summary: 특정 유해종 서식지에 대해 검색하기
+          value: 블루길 서식지
+        searchUserByName:
+          summary: |
+            `name`에 `john`이 들어가는 유저를 검색하기
+          value: john
+        searchSpeciesByName:
+          summary: |
+            `name`, `binomialName`에 `붉은`이 들어가는 생태계 교란종을 검색하기
+        search2020:
+          summary: |
+            `2020년` 이라는 단어가 들어가는 내용을 검색하기
+          value: 2020년
+    IdParam:
+      in: path
+      name: id
+      description: 찾고자 하는 특정한 id
+      required: true
+      schema:
+        $ref: '#/components/schemas/ObjectId'
+      example: 63033b49509996e9c941b55b
+    Author:
+      in: query
+      name: author
+      description: |
+        특정 유저가 작성한 글만 검색합니다.
+
+        값으로 유저 이름이 아니라 유저 `id`를 넣는다는 점에 주의하세요.
+      schema:
+        $ref: '#/components/schemas/ObjectId'
+    CategoryParam:
+      in: query
+      name: category
+      description: |
+        특정 카테고리에 올라온 글만 검색합니다.
+
+        각 카테고리별로 게시판 뷰를 만든다면
+        이 파라미터를 유용하게 사용할 수 있습니다.
+
+        예를 들어 앱을 구현할 때 '신고 게시판' 화면에는 `report` 카테고리에 올라온 글만
+        불러오고 싶다면 `category=report` 처럼 사용할 수 있습니다:
+      schema:
+        $ref: '#/components/schemas/Category'
+      examples:
+        getPostsFromReportCategory:
+          summary: 신고 게시판의 글만 불러옵니다.
+          value: report
+        getPostsFromQACategory:
+          summary: 질문 게시판의 글만 불러옵니다.
+          value: qa
+        getPostsFromInfoCategory:
+          summary: 정보 게시판의 글만 불러옵니다.
+          value: info
+    SpeciesParam:
+      in: query
+      name: species
+      description: |
+        특정 생태계 유해종을 다루는 글에 대해서만 검색합니다.
+
+        유해종의 이름이 아니라 id를 넣어서 검색한다는 점에 주의하세요.
+
+        자세한 내용은 `Post` 스키마의 `species` 필드의 설명을 참고하세요.
+      schema:
+        $ref: '#/components/schemas/ObjectId'
+    LocationParam:
+      in: query
+      name: location
+      description: |
+        현재 사용자의 위치를 전달합니다.
+
+        `sortBy=location` 으로 거리 정렬을 할 때 이 옵션으로 현재의 위치를 반드시 전달해야 합니다.
+
+        `sortBy`를 `location`로 지정하지 않았다면 이 파라미터는 아무 역할도 하지 않습니다.
+      schema:
+        $ref: '#/components/schemas/LocationTuple'
+      explode: false
+    SortBy:
+      in: query
+      name: sortBy
+      description: >
+        # 정렬 기준
+
+
+        결과 배열의 정렬 기준을 설정합니다.
+
+
+        ## 종류
+
+
+        각 정렬 옵션은 상호 배제적입니다. \
+
+        즉, 한번에 하나의 정렬 기준만 설정할 수 있습니다.
+
+
+        또한 언제 어디서 조회를 하든 반드시 하나의 정렬 기준이 주어져야 합니다. \
+
+        만약 `sortBy` 파라미터를 생략한다면, 기본값을 사용해서 정렬합니다.
+
+
+        | 종류 | 속성 값 | 설명 |
+
+        | --- | --- | --- |
+
+        | 시간순 정렬 | `date` | 시간순(최신순)으로 정렬합니다. *기본값입니다. |
+
+        | 거리순 정렬 | `location` | 현재 위치로부터 가까운 순으로 정렬합니다. |
+
+        | 정확도순 | `search` | 검색어에 대한 정확도순으로 정렬합니다. |
+
+
+        ### 시간순 정렬
+
+
+        해당 정렬을 위해서 어떠한 다른 파라미터도 필요하지 않습니다.
+
+
+        현재까지는 시간 범위 검색(x월 y일 중 올라온 글 검색, 특정 날보다 이전 글 검색 등)을 지원하지 않습니다.
+
+
+        ### 거리 정렬
+
+
+        `Post` 데이터의 `location` 속성을 비교해 가며 결과들을 현재 위치와의 거리순으로 정렬합니다. \
+
+        `location` 속성은 있을수도 있고 없을수도 있기 때문에, 해당 검색 중에는 `location` 값이 없는 글은 모조리
+        무시됩니다.
+
+
+        이 정렬을 사용하기 위해서는 반드시 `location` 파라미터에 현재 위치를 지정해야 합니다.
+
+
+        #### Post의 `location`과의 차이
+
+
+        **주의: `Post` 스키마의 `location` 속성과 이 엔드포인트의 `location` 파라미터는 다릅니다.**
+
+
+        쉽게 설명하자면 스키마에 있는 `location` 은 실제 DB에 저장되는 내용이며,
+
+        글을 생성할 때, 수정할 때, 조회할 때 결과나 입력으로 나타납니다.
+
+
+        반면에 해당 요청(`GET /posts`)의 `location` 파라미터는 URL에 선택적으로 들어가는 `검색 조건` 이며,
+
+        거리 정렬을 할 때 현재 자신(사용자)의 위치를 서버에 전달하는 데 사용합니다.
+
+
+        이 값이 전달되면 서버는 `location` 파라미터로 전달받은 유저의 현재 위치와 가장 가까운
+
+        `location` 을 가진 `Post` 를 찾아 건네준다고 생각하면 좋습니다.
+
+
+        #### 기능 구현
+
+
+        거리 정렬은 '(웹)앱 사용자의 주변에서 발생한 생태계 교란종에 대한 정보'
+
+        를 시각화해서 전달하는 기능에 특별히 유용합니다.
+
+
+        각각의 글들을 위치별로 정리해서 지도 형태로 보여주거나
+
+        가까운 지역에서 교란종이 발생하면 알림을 주는 등의 기능을 구현하는 데 사용할 수 있습니다.
+
+
+        자세한 내용은 `Post` 스키마의 `location` 필드에 적힌 내용을 참고하세요.
+
+
+        ### 정확도순 정렬
+
+
+        이 정렬을 사용하기 위해서는 반드시 `search` 파라미터에 검색할 텍스트를 입력해야 합니다.
+
+
+        주어진 텍스트로 검색을 한 후 `text` 인덱스에 맞게 가장 검색어에 가까운 결과순으로 정렬되어 보내집니다.
+
+
+        ## 제한
+
+
+        현재 정렬은 낮은 우선순위의 정렬 기준을 제공하지 않습니다. \
+
+        (한번의 조회에 단 하나의 정렬 기준만 사용할 수 있습니다)
+
+
+        예를 들어 `date`를 기준으로 하는 경우 '정확히 같은 날의 정화히 같은 시간에 올라온' \
+
+        두 개 이상의 글이 존재하는 경우, 그 글들끼리의 정렬 순서를 보장하지 않습니다.
+      schema:
+        type: string
+        enum:
+          - date
+          - location
+        default: date
+    SortOrder:
+      in: query
+      name: sortOrder
+      description: >
+        # 정렬 순서
+
+
+        정렬 순서를 결정합니다.
+
+
+        ## 종류
+
+
+        순서 옵션은 `오름차순`과 `내림차순` 두 가지가 존재합니다.
+
+         - `asc`: 오름차순으로 정렬.
+         - `desc`: 내림차순으로 정렬. *기본값입니다.
+
+        현재까지는 무작위로 정렬(샘플링)하는 기능이 없으며, 구현할 계획 또한 없습니다.
+
+
+        정렬 자체를 무시하고 싶어도 현재 API 명세상 불가능합니다. \
+
+        `sortBy` 옵션과 이 파라미터를 둘다 생략해도 기본값인 `date-desc`로 정렬되어 전달됩니다.
+
+
+        독자적인 기준의 정렬을 구현하고 싶다면 프런트엔드/앱 단에서 구현이 필요합니다.
+
+
+        ## 정렬 기준별 동작 차이
+
+
+        | 정렬 기준 | 오름차순 동작 | 내림차순 동작| 설명 |
+
+        | --- | --- | --- | --- |
+
+        | `date` | 가장 오래된 글부터 시작 | 가장 최신 글부터 시작 | `Date`의 비교는 `timestamp`화한 후
+        진행되기 때문에 `1134313200000`(2005년)은 `1661832502025`(2022년)보다 '낮다고' 평가됩니다. |
+
+        | `location` | 현재 위치에서 가장 가까운 곳부터 시작 | 현재 위치에서 가장 먼 곳부터 시작 | `location`의
+        비교는 현재 지역부터 대상 지점까지의 `거리`를 기준으로 정렬하기 때문에 가까운 장소가 먼 장소보다 '낮다고' 평가됩니다. |
+
+        | `search` | 가장 정확도가 낮은 검색결과부터 시작 | 가장 정확도가 높은 검색결과부터 시작 | 딱히 이유는 없고 그저
+        predefined된 동작입니다. |
+
+
+        예를 들어 가장 최신글부터 보여주고 싶다면 `sortBy=date&sortOrder=desc`를, \
+
+        가장 가까운 곳부터 보여주고 싶다면 `sortBy=location&sortOrder=asc`를 사용할 수 있습니다.
+
+
+        전자의 경우, `sortBy`는 `date`가 기본값이고 `sortOrder`는 `desc`가 기본값이므로
+
+        둘다 생략해도 동일하게 작동합니다.
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        example: asc
+        default: desc
+  securitySchemes:
+    JWTAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: |
+        요청이 잘못되었거나 처리할 수 없습니다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    Unauthorized:
+      description: |
+        인증에 실패했습니다.
+
+        헤더에 적절한 토큰을 넣어 전달해 주세요.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    Forbidden:
+      description: |
+        해당 객체에 접근하거나 또는 수정하거나 또는 삭제할 권한이 부족합니다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+    NotFound:
+      description: |
+        일치하는 `id`를 가진 객체 또는 요청한 값을 찾지 못했습니다.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HttpError'
+paths:
+  /login:
+    summary: 로그인하기
+    description: 로그인과 관련된 동작을 다룹니다.
+    post:
+      operationId: login
+      summary: 로그인 또는 회원가입
+      description: >
+        # 로그인
+
+
+        전달된 이름과 비밀번호에 일치하는 유저를 DB에서 찾아 로그인합니다.
+
+
+        만약 주어진 요청에 대응되는 유저가 없다면, 새로 생성합니다.
+
+        따라서 회원가입을 위한 별도의 엔드포인트가 존재하지 않습니다.
+
+
+        ## 응답
+
+
+        로그인에 실패한 경우, 401을 반환합니다.
+
+
+        요청을 해석할 수 없는 경우, 400을 반환합니다.
+
+
+        로그인이 성공한 경우, 200을 반환합니다.
+
+
+        ## API key
+
+
+        기존에 이미 있는 유저이든 생성한 유저이든, 로그인 요청이 들어올 때마다 새 API 키가 생성되어 전달됩니다.
+
+
+        기본적으로 [JWT](https://jwt.io)토큰이며, 페이로드에 현재 로그인한 사용자의 `id`값을 포함하고 있습니다.
+
+
+        본인을 인증하기 위해서는 매 요청마다 이 토큰을 `Bearer` 헤더에 넣어 함께 전달해야 합니다. \
+
+        그렇지 하지 않은 경우 많은 작업에서 `401`에러가 발생합니다.
+
+
+        `쿠키` 등을 사용하지 않는 방식이므로 안드로이드, iOS등의 모바일 클라이언트에서도 \
+
+        로컬 스토리지에 토큰을 저장해두는 방식 등으로 동일한 인증 방식을 사용 가능합니다.
+
+
+        ### 작업 종류별 토큰 요구 여부
+
+
+        주로 `/users/me`등 `POST`나 기타 메소드를 사용하는 작업에서 토큰을 요구하며, 서버는 이 토큰을 통해 사용자를
+        식별해냅니다. \
+
+        (그렇지 않으면 `me`가 누구인지 등을 알 수 없습니다.)
+
+        | Method Type | Token 필요 여부 | Note |
+
+        | --- | --- | --- |
+
+        | `GET` | false | 주로 공개된 값을 패치해옵니다. |
+
+        | `POST` | true | 주로 (본인 명의로) 새 값을 만듭니다. |
+
+        | `PUT` | true | 주로 본인이 만든 값을 수정하는 데 쓰입니다. |
+
+        | `DELETE` | true | 주로 본인이 만든 값을 삭제하는 데 쓰입니다. |
+
+        현재 유일한 예외는 `/login` 자체뿐입니다.
+
+
+        가장 이상적인 방법으로 매 요청마다 토큰을 전달하는 방법이 있습니다.
+
+
+        ### 로그아웃
+
+
+        세션을 사용하지 않기 때문에 별도의 로그아웃(세션 파기) 요청이 필요하지 않습니다. \
+
+        단순히 로컬 저장소에서 발급받은 토큰 값을 삭제하시면 됩니다.
+
+
+        따라서 다른 사용자로 로그인하려는 경우,
+         1. 화면에서 `로그아웃` 버튼이 눌리면 실제로 서버에 요청을 보낼 필요 없이 내부에 저장해둔 토큰 값을 삭제한 후
+         2. 사용자가 다시 `로그인` 버튼을 누르고 새 사용자 정보를 입력하면 `/login`에 요청을 보내고
+         3. 그 결과로 받은 토큰을 저장하시면 됩니다.
+      tags:
+        - Miscellaneous
+      security: []
+      requestBody:
+        description: |
+          로그인 정보를 전달합니다. \
+          이 때, 비밀번호는 평문으로 전달합니다.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: alice
+                password:
+                  $ref: '#/components/schemas/Password'
+      responses:
+        '200':
+          description: |
+            로그인 또는 유저 생성에 성공했습니다.
+
+            `key`에는 발급된 API키가, `user`에는 유저 정보가 전달됩니다.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    $ref: '#/components/schemas/Token'
+                  user:
+                    $ref: '#/components/schemas/User'
+                required:
+                  - key
+                  - user
+              example:
+                key: >-
+                  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+                user:
+                  id: 6308a2c3d95ee0cf64b2e992
+                  name: alice
+                  createdAt: 1661493944000
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/BadRequest'
+  /users:
+    summary: 유저 정보
+    description: |
+      로그인된 사용자가 아닌 다른 유저들에 대한 정보를 담당합니다.
+    get:
+      operationId: getUsers
+      summary: 유저 목록 가져오기
+      description: |
+        간략한 유저 정보를 담은 객체로 이루어진 배열을 반환합니다.
+
+        `skip`, `limit`, `search` 등을 사용해 간략한 검색 및 페이징을 수행할 수 있습니다.
+
+        특히나 `search` 를 사용해 유저의 이름을 검색할 수 있습니다.
+      tags:
+        - User
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Skip'
+        - $ref: '#/components/parameters/Search'
+      responses:
+        '200':
+          description: 유저 정보를 담은 JSON Array를 반환합니다.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /users/me:
+    summary: 현재 로그인한 사용자를 가리키는 엔드포인트
+    description: 현재 로그인한 유저의 정보를 얻거나 수정합니다
+    post:
+      operationId: getMe
+      summary: 현재 로그인한 사용자의 정보 가져오기
+      description: |
+        현재 로그인한 사용자의 유저 정보를 가져옵니다.
+
+        정확히 말하면, 주어진 토큰와 대응되는 유저의 정보를 가져옵니다.
+
+        사실 JWT토큰도 디코딩만 하면 유저 id를 바로 알 수 있지만,
+        일반적인 방법이 아니기에 이러한 API가 존재합니다.
+
+        따라서 유저 토큰은 있지만 유저 id를 알지 못할 때 쓸 수 있는 유용한 API입니다.
+      tags:
+        - User
+      responses:
+        '200':
+          description: >
+            유저 정보를 가져옵니다.
+
+
+            기본적으로 `/login` 시에 나오는 출력의 `user` 항목과 같은 내용이 들어 있습니다.
+
+
+            `recentPosts` 등 부가적인 '프로필 페이지에 어울리는' 정보를 얻기 위해선 `/users/{id}` 가
+            필요합니다.
+
+
+            따라서 이 API로 id를 알아낸 후에 `/users/{id}`로 요청을 보낼 수 있습니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      operationId: editMe
+      summary: 현재 로그인한 사용자의 정보 수정하기
+      description: 현재 로그인한 사용자의 정보 중에서 수정할 부분만 담은 객체를 전송합니다.
+      tags:
+        - User
+      requestBody:
+        description: |
+          모든 필드는 optional 입니다. \
+          따라서 기존 객체에서 수정할 부분만 전달하시면 됩니다.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: |
+            성공적으로 유저가 수정되었습니다.
+
+            응답으로 수정된 유저의 정보를 전달합니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      operationId: deleteMe
+      summary: 현재 로그인한 사용자 삭제하기
+      description: |
+        내부적으로 사용자를 DB에서 완전히 삭제하지는 않습니다.
+
+        따라서 새 유저를 만들 때 `name`을 현재 삭제된 상태인 유저(들)의 `name`과 같게 만들 수 없습니다.
+      tags:
+        - User
+      responses:
+        '200':
+          description: |
+            성공적으로 유저가 삭제되었습니다.
+
+            응답으로 삭제된 유저의 정보를 전달합니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/me/password:
+    summary: 비밀번호 변경
+    description: 현재 로그인한 사용자의 비밀번호를 변경합니다
+    post:
+      operationId: changePassword
+      summary: 현재 로그인한 사용자의 비밀번호 변경하기
+      description: |
+        비밀번호 변경에 현재 비밀번호 입력이 요구되기 때문에 \
+        `PUT /users/me` 와는 별도로 분리된 엔드포인트를 사용합니다.
+
+        인증뿐만 아니라 비밀번호 또한 일치해야 하며, 각 경우에 따른 상태 코드는 다음과 같습니다.
+
+        | 상황 | HTTP 응답 코드 | 상태 |
+        | --- | --- | --- |
+        | 토큰 인증이 실패함 | 401 | 실패 |
+        | 토큰 인증은 성공했지만 보내준 `old` 비밀번호가 DB에 저장된 비밀번호와 맞지 않음 | 403 | 실패 |
+        | 위 두 조건 모두 통과함 | 200 | 성공 |
+      tags:
+        - User
+      requestBody:
+        description: |
+          비밀번호 변경 요청은 아래의 두 필드를 받습니다:
+            - `old`: 현재 비밀번호입니다. \
+              변경이 성공하면 이전 비밀번호가 됩니다.
+            - `new`: 새 비밀번호입니다. \
+              변경이 성공하면 현재 비밀번호가 됩니다.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                old:
+                  $ref: '#/components/schemas/Password'
+                new:
+                  $ref: '#/components/schemas/Password'
+              required:
+                - old
+                - new
+              example:
+                old: 1q2w3e
+                new: 4r5t6y
+      responses:
+        '200':
+          description: |
+            비밀번호가 성공적으로 변경되었습니다.
+
+            상태 코드를 제외하면 아무 응답도 되돌려주지 않습니다.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/{id}:
+    summary: 특정한 유저 데이터 가져오기
+    description: id가 일치하는 유저의 정보를 가져온다.
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getUser
+      summary: id로 특정 유저 조회하기
+      description: |
+        id가 일치하는 유저를 찾아 정보를 보여줍니다.
+
+        프로필 페이지 등의 구현에 유용합니다.
+      tags:
+        - User
+      security: []
+      responses:
+        '200':
+          description: id가 일치하는 유저를 찾았습니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /posts:
+    get:
+      operationId: getPosts
+      summary: 글 조회 및 검색
+      description: >
+        # 글 조회
+
+
+        특정한 조건에 맞게 글들을 가져옵니다.
+
+
+        인터넷 게시판으로 치면 게시판에서 `F5`를 눌렀을 때 보여지는 화면에 쓰인다고 생각하시면 좋습니다.
+
+
+        ## 주의사항
+
+
+        결과는 글이 추가되면서 계속 변할 수 있습니다. \
+
+        아무 인자도 주지 않았을 경우 기본적으로 시간순(최신순)으로 정렬됩니다. 최신글이 아닌 다른 게 필요하다면 조건을 설정해 주세요.
+
+
+        결과는 배열로 전달됩니다. \
+
+        검색 조건에 맞는 결과가 하나도 없어 빈 배열이 나오더라도 `404`(찾을 수 없음)가 아닌 `200`(성공)으로 표시됩니다.
+
+
+        아무 인자 없이 사용하면 DB에서 모든 글을 가져옵니다. \
+
+        `limit`은 생략 가능한 파라미터이지만 모바일 앱의 데이터 보호,
+
+        웹사이트의 로딩 속도 최적화, DB의 부하 방지 등을 위해
+
+        (꼭 필요한 경우가 아닌 이상) limit을 필요한 만큼만으로 설정해 주세요.
+
+
+        **검색 전용 API가 따로 존재하지 않습니다.** \
+
+        이 엔드포인트에서 여러 조건을 사용해서 검색 기능도 수행하게 만들 수 있습니다.
+
+
+        ## 검색과 조건
+
+
+        모든 조건은 `AND`로 결합됩니다. \
+
+        예를 들어 `author=xx&category=report` 로 검색하는 경우, 글쓴이가 `xx`이거나 `report` 카테고리에
+        속한 글이 검색되는 것이 **아니라**, `xx`가 작성한 글 중에서 `report` 카테고리에 속한 글만 검색됩니다.
+
+
+        모든 조건은 선택사항입니다. 다만 `category`의 경우 일반적인 글 불러오기 기능에서는 항상 설정하는 것이 좋습니다. \
+
+        예:
+          1. 각 게시판별로 다른 뷰가 있는 경우: \
+          각 게시판의 글을 불러올 때는 `category=<현재 카테고리>` 를 사용합니다. 따라서 아무리 `F5`를 하더라도 A카테고리에는 A카테고리의 글만 목록에 보입니다.
+          2. 검색 기능을 위한 뷰를 따로 만드는 경우: \
+          검색창에서는 `category`조건을 선택사항으로 잡습니다. 따라서 A카테고리의 글과 B카테고리의 글이 섞여서 검색결과 뷰에 노출될 수 있습니다.
+
+        ### 페이징
+
+
+        검색용 조건과는 별개로, 어디부터 어디까지의 결과를 받을 것인지에 대한 조건도 설정할 수 있습니다.
+
+         - `limit`: 결과 갯수 제한
+         - `skip`: 앞부분 건너뛰기. 이 두 조건은 페이징 기능에 유용합니다.
+         - `sortBy`: 정렬 기준. \
+           어떤 필드를 기준으로 정렬할지를 정합니다. 기본값은 `date`(시간순 정렬)입니다.
+         - `sortOrder`: 정렬 순서. \
+           정렬을 오름차순 으로 할지 내림차순으로 할지 결정합니다.
+      tags:
+        - Post
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Author'
+        - $ref: '#/components/parameters/CategoryParam'
+        - $ref: '#/components/parameters/SpeciesParam'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/LocationParam'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Skip'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortOrder'
+      responses:
+        '200':
+          description: |
+            글이 성공적으로 조회되었습니다
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      operationId: addPost
+      summary: 새 글 발행하기
+      description: |
+        주어진 값으로 새 게시물을 만듭니다.
+
+        각 필드의 의미와 역할에 대해서는 `Post` 스키마 문서를 참고하세요.
+      tags:
+        - Post
+      requestBody:
+        description: |
+          등록할 글에 대한 내용을 Body에 넣어서 보내야 합니다.
+
+          `Post`의 자세한 구조와 어떤 필드가 어떤 역할인지 등에 대한 내용은
+          `Post`의 스키마 문서를 참고하세요.
+
+          사진이 포함되어 있기 때문에 요청을 보낼 형식으로 `multipart/form-data`를 사용해야 합니다.
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Post'
+            encoding:
+              imageFile:
+                contentType: Image/*
+      responses:
+        '201':
+          description: |
+            새 포스트가 성공적으로 생성되었습니다.
+
+            응답으로 생성된 포스트의 정보를 전달합니다. \
+            만약 포스트 생성이 끝난 후 바로 해당 포스트로 이동하고 싶다면
+            결과로 온 `Post`객체의 `id`값을 사용할 수 있습니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /posts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getPost
+      summary: id로 특정 글 조회하기
+      description: |
+        # 글 보기
+
+        id가 일치하는 글을 찾아 보여줍니다.
+
+        게시글 보기 페이지(뷰)를 구현할 때 유용합니다.
+
+        ## 검색 엔드포인트와의 차이점
+
+        `/posts`에서 나오는 간략한 `PostPreview` 스키마와는 다르게, \
+        글의 전문이나 모든 댓글 목록, 모든 이미지 목록 등 크기가 큰 데이터가 전달됩니다.
+
+        따라서 `/posts`는 검색 및 새 게시글 목록 페이지(뷰) 구현에 유용하며, \
+        `/posts/{id}`는 하나의 글을 읽으려고 할 때 유용합니다.
+
+        ### 필드별 상세
+
+        `content` 필드는 마크다운 문법이 적용되는 플레인 텍스트입니다.
+
+        `images` 필드는 별도의 배열입니다.
+
+        따라서 본문 중간중간에 이미지가 특정 위치에 삽입되어 있는 것이 아니라, \
+        본문이 따로 있고 첨부된 이미지가 따로 있는 형태입니다.
+
+        `comments` 필드는 시간순으로 정렬되어 있는 댓글의 목록입니다.
+      tags:
+        - Post
+      security: []
+      responses:
+        '200':
+          description: |
+            `id`가 일치하는 글을 찾았습니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: editPost
+      summary: 자신이 쓴 글 수정하기
+      description: 기존 자신이 쓴 글에서 수정할 부분만 담은 객체를 전송합니다.
+      tags:
+        - Post
+      requestBody:
+        description: |
+          모든 필드는 optional 입니다. \
+          따라서 기존 객체에서 **수정할 부분만** 전달하시면 됩니다.
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PostPartial'
+            encoding:
+              imageFile:
+                contentType: image/*
+      responses:
+        '200':
+          description: |
+            성공적으로 글이 수정되었습니다.
+
+            응답으로 수정된 글의 정보를 전달합니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deletePost
+      summary: 자신이 쓴 글 지우기
+      description: |
+        내부적으로 글 데이터를 완전히 삭제하지는 않습니다.
+      tags:
+        - Post
+      responses:
+        '200':
+          description: |
+            성공적으로 글이 삭제되었습니다.
+
+            응답으로 삭제된 글의 정보를 전달합니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /posts/{id}/comments:
+    summary: 댓글 관리하기
+    description: 댓글과 관련된 여러 동작을 맡습니다.
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      operationId: addComment
+      summary: 댓글 추가하기
+      description: >
+        # 댓글
+
+
+        특정 글에 새 댓글을 추가합니다.
+
+
+        ## 동작
+
+
+        모든 글은 속성으로 댓글의 배열(`comments`)을 가지고 있으며, 주어진 값이 없디면 `[]`으로 초기화됩니다.
+
+
+        그 후 사용자가 댓글을 추가하는 순서대로 배열에 댓글 객체가 추가되며, `/posts/{id}`로 특정 글을 조회할 때 해당 글이
+        가진 댓글 정보가 같이 전송됩니다.
+
+
+        글을 조회할 시 전달되는 배열은 각 댓글이 시간순으로 정렬되어 있습니다. 따라서 댓글을 글 보기 화면에 표시하려는 경우,
+        프런트에서 재정렬할 필요 없이 `map` 해주시면 됩니다. \
+
+        자세한 내용은 `/posts/{id}` 의 설명을 참고하세요.
+
+
+        ## 구현되지 않은 동작
+
+
+        해당 API의 댓글 기능은 굉장히 제한적이며, 다양한 동작을 하기 불가능합니다.
+
+         - 댓글 수정 기능이 존재하지 않습니다.
+         - 댓글 삭제 기능이 존재하지 않습니다.
+         - 댓글 알림 기능이 존재하지 않습니다.
+         - 대댓글, 또는 대대댓글 기능이 존재하지 않습니다.
+         - 댓글에 vote 기능이 존재하지 않습니다.
+         - 댓글에 페이징 기능이 존재하지 않습니다. \
+           (따라서 한번에 많은 댓글이 있다면 전부 불러와야 합니다)
+         - 댓글에 스레딩 기능이 존재하지 않습니다.
+
+         위 기능들은 현재 복잡성을 줄이기 위해 **의도적으로** 배제되었으며, 향후 추가될 계획이 없습니다.
+      tags:
+        - Post
+      requestBody:
+        description: |
+          `content`에 등록하고자 하는 댓글 내용을 적어주세요.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comment'
+      responses:
+        '201':
+          description: |
+            성공적으로 댓글이 추가되었습니다.
+
+            응답으로 생성된 댓글의 정보를 전달합니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /species:
+    summary: 생태계 교란종에 정보 얻기
+    description: 생태계 교란종에 대한 정적인 정보입니다.
+    get:
+      summary: 생태계 교란종 목록 얻기
+      description: |
+        # 교란종 정보 
+
+        현재까지 데이터베이스에 등록된 모든 생태계 교란종에 대한 정보를 가져옵니다.
+
+        ## 변경 여부
+
+        이 정보는 정적이며, 바뀌지 않습니다.
+
+        데이터를 수정하기 위한 정보 또한 제공하지 않습니다.
+
+        해당 데이터는 어떤 사용자의 권한에도 종속되지 않으며,
+        열람에 어떠한 인증도 필요하지 않습니다.
+
+        ## 조회
+
+        파라미터를 사용해 `GET /posts` 와 비슷하게 특정 조건에 맞는
+        유해종에 대한 검색을 수행할 수 있습니다.
+
+        현재까지 지원하는 검색은 단순 문자열 검색이 유일합니다.
+
+        `sortBy`파라미터를 지원하지 않으며,
+        현재까지는 모든 결과가 이름순으로 정렬됩니다. \
+        만약 문자열 검색을 사용하는 경우, 정확도순으로 정렬됩니다.
+
+        `GET /users`, `GET /posts`와 마찬가지로 `limit`과 `skip`파라미터를
+        통해 검색결과를 제한할 수 있습니다.
+
+        Ajax(또는 기타 웹 요청)를 통해 유해종 실시간 검색을 지원하려는 경우
+        `limit`을 5~7개 정도로 잡고 요청을 보내는 것이 이상적입니다.
+
+        ## 정보 출처
+
+        현재까지 이 API로 얻을 수 있는 모든 정보는
+        [한국 외래생물 정보시스템](https://kias.nie.re.kr)에 의존합니다.
+
+        외래생물 정보시스템의 저작권 정책에 따라
+        각 생물정보에 별도의 출처가 표기되어 있습니다.
+      operationId: getSpecies
+      tags:
+        - Species
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Skip'
+      responses:
+        '200':
+          description: 생태계 교란종에 대한 정보를 가져옵니다.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpeciesPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /species/{id}:
+    summary: id로 특정 생태계 교란종에 대한 정보 조회하기
+    description: 특정 생태계 교란종에 대한 정적인 정보입니다.
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      summary: id로 특정 생태계 교란종에 대한 정보 조회하기
+      description: |
+        특정한 생태계 교란종에 대한 자세한 정보를 제공합니다.
+      operationId: getOneSpecies
+      tags:
+        - Species
+      security: []
+      responses:
+        '200':
+          description: 정보를 성공적으로 찾았습니다.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Species'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+tags:
+  - name: Miscellaneous
+    description: 로그인, 유해종 목록 등 기타 API
+  - name: User
+    description: 로그인을 제외한 유저 관련 조회, 변경, 삭제 API
+  - name: Post
+    description: 글 작성, 조회, 수정, 삭제, 댓글 관련 API
